@@ -1,4 +1,4 @@
-# 🍯 SSH Honeypot
+#  SSH Honeypot
 
 Simple SSH honeypot using Paramiko to capture login credentials.
 
