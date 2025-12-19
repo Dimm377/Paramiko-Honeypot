@@ -95,7 +95,7 @@ jobs:
       - name: Install security tools
         run: |
           python -m pip install --upgrade pip
-          pip install bandit safety
+          pip install bandit pip-audit
 
       - name: Run Bandit security scan
         run: |
@@ -105,7 +105,7 @@ jobs:
       - name: Check dependencies for vulnerabilities
         run: |
           pip install -r requirements.txt
-          safety check --full-report || true
+          pip-audit --strict --progress-spinner off || true
 
       - name: Upload security report
         uses: actions/upload-artifact@v4
