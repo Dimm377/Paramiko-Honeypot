@@ -22,7 +22,7 @@ ssh -p 2222 test@localhost
 
 ## Log
 
-Credentials save in here `honeypot.log`:
+Credentials saved in here `honeypot.log`:
 
 ```
 🔑 AUTH ATTEMPT - IP: @localhost | User: test | Pass: anjirlah gabisa login
