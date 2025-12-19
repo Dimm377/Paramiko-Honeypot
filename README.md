@@ -1,5 +1,7 @@
 #  SSH Honeypot
 
+![CI](https://github.com/Dimm377/Paramiko-Honeypot/actions/workflows/ci.yml/badge.svg)
+
 Simple SSH honeypot using Paramiko to capture login credentials.
 
 ## Install
