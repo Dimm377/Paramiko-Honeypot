@@ -22,7 +22,11 @@ def log_connection(ip: str, port: int):
     logger.info(f"🔌 CONNECTION - {ip}:{port}")
 
 def log_auth_attempt(ip: str, username: str, password: str):
-    logger.warning(f"🔑 AUTH ATTEMPT - IP: {ip} | User: {username} | Pass: {password}")
+    # Never persist submitted passwords. The honeypot records telemetry only.
+    logger.warning(
+        f"🔑 AUTH ATTEMPT - IP: {ip} | User: {username} | "
+        f"Password length: {len(password)} | Pass: [REDACTED]"
+    )
 
 def log_command(ip: str, command: str):
     logger.info(f"💻 COMMAND - IP: {ip} | Cmd: {command}")

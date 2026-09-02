@@ -7,8 +7,8 @@ import os
 from ssh_server import SSHServerInterface, FakeShell
 from logger import log_connection, log_disconnect, log_error, log_info
 
-HOST = ""
-PORT = 2222
+HOST = os.getenv("HONEYPOT_HOST", "127.0.0.1")
+PORT = int(os.getenv("HONEYPOT_PORT", "2222"))
 RSA_KEY_FILE = "server_rsa.key"
 
 def generate_rsa_key():
