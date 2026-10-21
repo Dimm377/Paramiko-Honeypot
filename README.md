@@ -6,9 +6,9 @@ Run this project in an isolated local lab.
 
 ## Quickstart
 
-### 1. Requirements and setup
+### 1. Setup
 
-Requires Python 3.9 or newer.
+Requires Python 3.9 or newer:
 
 ```bash
 python3 -m venv .venv
@@ -16,130 +16,33 @@ source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
-### 2. Start the honeypot
+### 2. Run
 
-By default, the server binds to `127.0.0.1:2222` in `accept_all` mode:
+Start the honeypot on `127.0.0.1:2222`:
 
 ```bash
 python Honeypot.py
 ```
 
-Console output confirms startup:
-
-```text
-[2026-10-21 18:00:00] INFO - ℹ️  INFO - Generating RSA key: server_rsa.key
-[2026-10-21 18:00:00] INFO - ℹ️  INFO - RSA key generated successfully
-[2026-10-21 18:00:00] INFO - ℹ️  INFO - 🍯 SSH Honeypot started on 127.0.0.1:2222 (mode: accept_all)
-[2026-10-21 18:00:00] INFO - ℹ️  INFO - Press Ctrl+C to stop
-```
-
 ---
 
-## Step-by-Step Testing Guide
+## Testing Guide
 
-Open a second terminal window to run client commands.
+Detailed step-by-step instructions for trying the interactive fake shell, testing scanner command execution, capturing brute-force attempts, and reading telemetry logs are documented in:
 
-### Test 1: Interactive fake shell
+👉 **[TESTING.md](TESTING.md)**
 
-Connect using OpenSSH:
-
-```bash
-ssh -p 2222 test@127.0.0.1
-```
-
-Type any password when prompted. The honeypot logs the attempt and drops you into a simulated Ubuntu 22.04 LTS prompt:
-
-```text
-test@127.0.0.1's password: supersecretpassword
-
-Welcome to Ubuntu 22.04.3 LTS
-
-root@ubuntu-server:~$ whoami
-root
-root@ubuntu-server:~$ pwd
-/root
-root@ubuntu-server:~$ id
-uid=0(root) gid=0(root) groups=0(root)
-root@ubuntu-server:~$ ls
-Desktop  Documents  Downloads  Music  Pictures  Videos
-root@ubuntu-server:~$ cat /etc/shadow
-cat: No such file or directory
-root@ubuntu-server:~$ exit
-Connection to 127.0.0.1 closed.
-```
-
-Terminal controls supported:
-- Backspace (`\x7f` and `\b`)
-- `Ctrl+C` clears the current buffer and reprompts
-- `Ctrl+D` closes the session
-- Arrow keys and ANSI escape codes are stripped without corrupting input
-
-### Test 2: Non-interactive automated command
-
-Simulate automated scanners or bot scripts that run a command directly without an interactive shell:
-
-```bash
-ssh -p 2222 test@127.0.0.1 whoami
-```
-
-Output:
-```text
-root
-```
-
-The honeypot answers the command, returns exit code 0, and closes the channel cleanly.
-
-### Test 3: Credential capture mode (`reject_all`)
-
-Stop the running server with `Ctrl+C`, then start it with `HONEYPOT_AUTH_MODE=reject_all`:
-
-```bash
-HONEYPOT_AUTH_MODE=reject_all python Honeypot.py
-```
-
-Try connecting:
+Quick connection test:
 
 ```bash
 ssh -p 2222 test@127.0.0.1
 ```
-
-Client output:
-```text
-test@127.0.0.1's password: 
-Permission denied (password).
-```
-
-Server log records the attempt, redacts the password, and refuses entry:
-
-```text
-[2026-10-21 18:05:00] WARNING - 🔑 AUTH ATTEMPT - IP: 127.0.0.1 | User: test | Password length: 8 | Pass: [REDACTED]
-```
-
-### Test 4: Reading telemetry logs
-
-All events are appended to `honeypot.log`:
-
-```bash
-tail -f honeypot.log
-```
-
-Example log entries:
-
-```text
-[2026-10-21 18:00:10] INFO - 🔌 CONNECTION - 127.0.0.1:45120
-[2026-10-21 18:00:12] WARNING - 🔑 AUTH ATTEMPT - IP: 127.0.0.1 | User: admin | Password length: 14 | Pass: [REDACTED]
-[2026-10-21 18:00:15] INFO - 💻 COMMAND - IP: 127.0.0.1 | Cmd: whoami
-[2026-10-21 18:00:20] INFO - 💻 COMMAND - IP: 127.0.0.1 | Cmd: ls
-[2026-10-21 18:00:25] INFO - 🔌 DISCONNECT - 127.0.0.1
-```
-
-Raw passwords are never stored. The logger records password character count and tags the value as `[REDACTED]`.
 
 ---
 
 ## Configuration Reference
 
-Set these environment variables before starting the script:
+Configure the honeypot using environment variables before running:
 
 | Variable | Default | Purpose |
 | :--- | :--- | :--- |
@@ -177,32 +80,7 @@ Run the full pytest suite:
 pytest tests/ -v
 ```
 
-All 22 unit and end-to-end integration tests should pass:
-
-```text
-tests/test_integration.py::test_e2e_non_interactive_exec PASSED
-tests/test_integration.py::test_e2e_interactive_shell_command PASSED
-tests/test_logger.py::test_telemetry_logger_in_memory_sink PASSED
-tests/test_logger.py::test_auth_attempt_redacts_password PASSED
-tests/test_logger.py::test_convenience_functions_work_and_record PASSED
-tests/test_server_daemon.py::test_load_or_generate_key_creates_and_loads PASSED
-tests/test_server_daemon.py::test_honeypot_server_initialization PASSED
-tests/test_server_daemon.py::test_honeypot_server_connection_dispatch PASSED
-tests/test_session.py::test_ssh_server_interface_auth_modes PASSED
-tests/test_session.py::test_ssh_server_interface_channel_request PASSED
-tests/test_session.py::test_ssh_server_interface_exec_request PASSED
-tests/test_session.py::test_honeypot_session_resource_cleanup_on_exception PASSED
-tests/test_session.py::test_honeypot_session_successful_shell_invocation PASSED
-tests/test_terminal.py::test_command_dispatcher_known_commands PASSED
-tests/test_terminal.py::test_command_dispatcher_unknown_command PASSED
-tests/test_terminal.py::test_command_dispatcher_exit_commands PASSED
-tests/test_terminal.py::test_terminal_stream_chunked_input PASSED
-tests/test_terminal.py::test_terminal_stream_pasted_multibyte_command PASSED
-tests/test_terminal.py::test_terminal_stream_backspace PASSED
-tests/test_terminal.py::test_terminal_stream_ctrl_c PASSED
-tests/test_terminal.py::test_terminal_stream_ctrl_d_eof PASSED
-tests/test_terminal.py::test_terminal_stream_ansi_arrow_keys_filtered PASSED
-```
+All 22 unit and end-to-end integration tests should pass.
 
 ---
 
