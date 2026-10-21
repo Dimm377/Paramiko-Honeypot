@@ -26,9 +26,10 @@ def test_ssh_server_interface_exec_request():
 
     result = interface.check_channel_exec_request(mock_channel, b"whoami")
     assert result is True
+    assert interface.is_exec is True
+    assert interface.exec_done_event.wait(timeout=1.0) is True
     mock_channel.send.assert_called_with("root\r\n")
     mock_channel.send_exit_status.assert_called_with(0)
-    mock_channel.close.assert_called_once()
 
 
 def test_honeypot_session_resource_cleanup_on_exception():
@@ -63,8 +64,9 @@ def test_honeypot_session_successful_shell_invocation():
         mock_shell_cls.return_value = mock_shell
 
         session = HoneypotSession(server_key=mock_key, auth_mode="accept_all")
-        # Trigger event in interface when start_server is called
+        # Trigger shell event in interface when start_server is called
         def fake_start_server(server):
+            server.is_shell = True
             server.event.set()
         mock_transport.start_server.side_effect = fake_start_server
 

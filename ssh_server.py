@@ -1,5 +1,6 @@
 import socket
 import threading
+import time
 from typing import List, Tuple, Optional
 import paramiko
 from paramiko import AUTH_FAILED, AUTH_SUCCESSFUL, OPEN_SUCCEEDED
@@ -134,6 +135,9 @@ class SSHServerInterface(paramiko.ServerInterface):
         self.client_ip = client_ip
         self.auth_mode = auth_mode
         self.event = threading.Event()
+        self.exec_done_event = threading.Event()
+        self.is_shell = False
+        self.is_exec = False
         self.dispatcher = CommandDispatcher()
 
     def check_channel_request(self, kind: str, chanid: int) -> int:
@@ -154,6 +158,7 @@ class SSHServerInterface(paramiko.ServerInterface):
         return "password"
 
     def check_channel_shell_request(self, channel) -> bool:
+        self.is_shell = True
         self.event.set()
         return True
 
@@ -165,13 +170,23 @@ class SSHServerInterface(paramiko.ServerInterface):
     def check_channel_exec_request(self, channel, command: bytes) -> bool:
         cmd = command.decode("utf-8", errors="ignore").strip()
         log_command(self.client_ip, cmd)
+        self.is_exec = True
 
-        # Non-interactive command execution (e.g. automated scanners or ssh host "cmd")
-        response, _ = self.dispatcher.execute(cmd)
-        if response:
-            channel.send(f"{response}\r\n")
-        channel.send_exit_status(0)
-        channel.close()
+        def run_exec():
+            try:
+                time.sleep(0.01)
+                response, _ = self.dispatcher.execute(cmd)
+                if response:
+                    channel.send(f"{response}\r\n")
+                channel.send_exit_status(0)
+                channel.shutdown_write()
+            except Exception:
+                pass
+            finally:
+                self.exec_done_event.set()
+
+        threading.Thread(target=run_exec, daemon=True).start()
+        self.event.set()
         return True
 
 
@@ -262,9 +277,16 @@ class HoneypotSession:
                 return
 
             ssh_interface.event.wait(timeout=10)
-            if ssh_interface.event.is_set():
+            if ssh_interface.is_shell:
                 fake_shell = FakeShell(channel, client_ip)
                 fake_shell.handle()
+            elif ssh_interface.is_exec:
+                ssh_interface.exec_done_event.wait(timeout=10)
+                # Allow client to read command output and close gracefully
+                time_waited = 0.0
+                while transport.is_active() and not channel.closed and time_waited < 5.0:
+                    time.sleep(0.05)
+                    time_waited += 0.05
 
         except paramiko.SSHException as e:
             log_error(f"SSH error from {client_ip}: {e}")
