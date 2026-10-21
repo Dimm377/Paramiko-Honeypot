@@ -32,7 +32,7 @@ jobs:
 
       - name: Run pylint
         run: |
-          pylint --disable=C0114,C0115,C0116 --exit-zero *.py
+          pylint --disable=C0114,C0115,C0116,R0903,R0913 --exit-zero *.py
 
   test:
     name: Test & Validation
@@ -61,8 +61,9 @@ jobs:
       - name: Verify imports
         run: |
           python -c "import paramiko; print(f'Paramiko version: {paramiko.__version__}')"
-          python -c "from ssh_server import SSHServerInterface, FakeShell; print('SSH Server imports OK')"
-          python -c "from logger import log_connection, log_disconnect, log_error, log_info; print('Logger imports OK')"
+          python -c "from ssh_server import SSHServerInterface, FakeShell, HoneypotSession; print('SSH Server imports OK')"
+          python -c "from logger import log_connection, log_disconnect, log_error, log_info, TelemetryLogger; print('Logger imports OK')"
+          python -c "from Honeypot import HoneypotServer, load_or_generate_key; print('Honeypot imports OK')"
 
       - name: Syntax check
         run: |
@@ -70,10 +71,6 @@ jobs:
           python -m py_compile ssh_server.py
           python -m py_compile logger.py
 
-      - name: Run tests (if available)
+      - name: Run test suite
         run: |
-          if [ -d "tests" ] && [ "$(ls -A tests/*.py 2>/dev/null)" ]; then
-            pytest tests/ -v --cov=. --cov-report=xml
-          else
-            echo "No tests directory found, skipping pytest"
-          fi
+          pytest tests/ -v
