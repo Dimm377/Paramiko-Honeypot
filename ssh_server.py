@@ -4,7 +4,7 @@ from typing import List, Tuple, Optional
 import paramiko
 from paramiko import AUTH_FAILED, AUTH_SUCCESSFUL, OPEN_SUCCEEDED
 
-from logger import log_auth_attempt, log_command, log_error, log_info
+from logger import log_connection, log_disconnect, log_auth_attempt, log_command, log_error, log_info
 
 
 class StreamEvent:
@@ -39,7 +39,7 @@ class TerminalStream:
             if self._in_escape:
                 self._escape_seq += char
                 # CSI sequences terminate on characters between 0x40 and 0x7E
-                if len(self._escape_seq) > 1 and char.isalpha() or char in ("~", "@"):
+                if len(self._escape_seq) > 1 and (char.isalpha() or char in ("~", "@")):
                     self._in_escape = False
                     self._escape_seq = ""
                 continue
@@ -232,3 +232,57 @@ class FakeShell:
 
     def execute_fake_command(self, command: str) -> str:
         return self.dispatcher.dispatch(command)
+
+
+class HoneypotSession:
+    """Encapsulates transport lifecycle, auth negotiation, and shell session dispatch."""
+
+    def __init__(self, server_key: paramiko.PKey, auth_mode: str = "accept_all"):
+        self.server_key = server_key
+        self.auth_mode = auth_mode
+
+    def handle(self, client_socket: socket.socket, client_addr: Tuple[str, int]):
+        client_ip = client_addr[0]
+        client_port = client_addr[1]
+        log_connection(client_ip, client_port)
+
+        transport = None
+        channel = None
+        try:
+            transport = paramiko.Transport(client_socket)
+            transport.local_version = "SSH-2.0-OpenSSH_8.9p1 Ubuntu-3ubuntu0.4"
+            transport.add_server_key(self.server_key)
+
+            ssh_interface = SSHServerInterface(client_ip, auth_mode=self.auth_mode)
+            transport.start_server(server=ssh_interface)
+
+            channel = transport.accept(timeout=30)
+            if channel is None:
+                log_error(f"No channel from {client_ip}")
+                return
+
+            ssh_interface.event.wait(timeout=10)
+            if ssh_interface.event.is_set():
+                fake_shell = FakeShell(channel, client_ip)
+                fake_shell.handle()
+
+        except paramiko.SSHException as e:
+            log_error(f"SSH error from {client_ip}: {e}")
+        except Exception as e:
+            log_error(f"Error handling {client_ip}: {e}")
+        finally:
+            log_disconnect(client_ip)
+            if channel is not None:
+                try:
+                    channel.close()
+                except Exception:
+                    pass
+            if transport is not None:
+                try:
+                    transport.close()
+                except Exception:
+                    pass
+            try:
+                client_socket.close()
+            except Exception:
+                pass
